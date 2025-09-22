@@ -17,24 +17,41 @@
         WatchWorthy.
     </div>  
             <div class="form" style="margin: auto; width: 70%; padding: 30px; height: auto;">
-                <div style="color: red; font-family: 'Montserrat', sans-serif; font-size: 40px; font-weight: 600;">
-                    Your score is {{sum}}<br>
-                <div style="font-size: 18px; margin-bottom: 50px;">
-                    Scoring a 12 or higher on the short version may indicate the presence of depression in the respondent.
-                </div>   
-                </div> {% for movie in recommendations %}
-                    <div style="color: white; font-family: 'Montserrat', sans-serif; font-size: 40px; font-weight: 600;">
-                        {{movie.title}}
+                {% if error_message %}
+                    <div style="color: #ff9d9d; font-family: 'Montserrat', sans-serif; font-size: 20px; font-weight: 400;">
+                        {{ error_message }}
                     </div>
+                {% endif %}
+
+                {% if sum is not None %}
+                    <div style="color: red; font-family: 'Montserrat', sans-serif; font-size: 40px; font-weight: 600;">
+                        Your score is {{ sum }}<br>
+                        <div style="font-size: 18px; margin-bottom: 50px;">
+                            Scoring a 12 or higher on the short version may indicate the presence of depression in the respondent.
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if recommendations %}
+                    {% for movie in recommendations %}
+                        <div style="color: white; font-family: 'Montserrat', sans-serif; font-size: 40px; font-weight: 600;">
+                            {{ movie.title }}
+                        </div>
+                        <div style="color: #c8c8c8; font-family: 'Montserrat', sans-serif; font-size: 20px; font-weight: 400;">
+                            Genres: {{ movie.genres|join:', ' }}
+                        </div>
+                        {% if movie.overview %}
+                            <div style="color: #9f9f9f; font-family: 'Montserrat', sans-serif; font-size: 16px; font-weight: 300; max-width: 60ch;">
+                                {{ movie.overview }}
+                            </div>
+                        {% endif %}
+                        <br>
+                    {% endfor %}
+                {% elif not error_message %}
                     <div style="color: #c8c8c8; font-family: 'Montserrat', sans-serif; font-size: 20px; font-weight: 400;">
-                        Genre: {{movie.genre}}
+                        Complete the questionnaire to discover personalised movie picks.
                     </div>
-                    <br>
-                    <!-- <input class="submitbutton" type="submit" value="Like">
-                    </input>
-                    <input class="submitbutton" type="submit" value="Dislike">
-                    </input> -->
-                {% endfor %}                
+                {% endif %}
             </div>
     </div>
     

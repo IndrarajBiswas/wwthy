@@ -1,0 +1,26 @@
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+/staticfiles/
+media/
+.env
+*.sqlite3
+*.db
+
+# VSCode/Pycharm
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Python virtual environments
+venv/
+.env/
+.envrc
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/

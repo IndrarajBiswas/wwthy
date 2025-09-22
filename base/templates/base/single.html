@@ -29,7 +29,7 @@
                 </svg>
             </div>
             <div class="superform">
-                <form action="/submitformsingle/" class="formfields" method="POST">
+                <form action="{% url 'base:submit_form_single' %}" class="formfields" method="POST">
                     {% csrf_token %}
                     <div class="entryfields">
                         <input id = "mail" name = "mail" type="email" placeholder="@ email" />
