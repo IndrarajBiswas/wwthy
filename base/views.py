@@ -1,141 +1,127 @@
-from importlib.abc import FileLoader
-from msilib.schema import RadioButton
-from multiprocessing import context
-from tkinter import Y
-from django.shortcuts import render
-from django.shortcuts import redirect, render, HttpResponse
-from django.utils.html import escape
-from .movie import reverse_genres, genres
-from base.models import forminput, singleforminput
-from django.http import HttpResponse
-from django.template import loader
-import json 
+"""Django views for rendering pages and handling form submissions."""
 
-# Create your views here.
+from __future__ import annotations
+
+import logging
+from dataclasses import asdict
+from typing import Iterable, List
+
+from django.core.exceptions import ImproperlyConfigured
+from django.shortcuts import render
+
+from base.models import forminput, singleforminput
+from .movie import MovieServiceError, fetch_recommendations
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_LANGUAGE = "en"
+SURVEY_FIELD_NAMES: List[str] = ["radio"] + [f"radio{i}" for i in range(1, 13)]
+
+
 def landing(request):
-    return render(request, 'base/landing.html')
+    return render(request, "base/landing.html")
+
 
 def multiple(request):
-    return render(request, 'base/multiple.html')
+    return render(request, "base/multiple.html")
+
 
 def single(request):
-    return render(request, 'base/single.html')
-
-import requests
+    return render(request, "base/single.html")
 
 
 def form_submit(request):
-    if request.method == 'POST':
-        print(request.POST)
-            # print(f'Value: {value}') in Python >= 3.7
-        email = request.POST['mail'] 
-        audiences = request.POST['audiences']
-        ageranges = request.POST['age-ranges']
-        gp = request.POST.getlist('gp')
-        
+    recommendations: List[dict] = []
+    error_message: str | None = None
 
-        print(gp)
-        genrestring = [] 
-        for string in gp: 
-            if(string != 'none'):
-                genrestring.append(str(genres[string][0]))
-        genrestring = ','.join(genrestring)
-        languages = request.POST['Languages']
-        x1 = requests.get("https://api.themoviedb.org/3/discover/movie?api_key=34fe3fc711aaf02629366ba6335190d4&language={}&page=1&include_adult=false&with_genres={}&sort_by=popularity.desc".format(languages, genrestring))
-        recommendations = []
-        for o in x1.json()['results']:
-            movie = {}
-            movie['title'] = o['title']
-            movie['genre'] = [reverse_genres[x] for x in o['genre_ids']]
-            #print(o['title'])
-            #print(o['original_language'])
-            #print([reverse_genres[x] for x in o['genre_ids']])
-            #print(o['popularity'])
-            recommendations.append(movie)     
+    if request.method == "POST":
+        email = (request.POST.get("mail") or "").strip()
+        audiences = _safe_int(request.POST.get("audiences"), default=1)
+        ageranges = (request.POST.get("age-ranges") or "-1").strip()
+        genre_preferences = _clean_genre_selection(request.POST.getlist("gp"))
+        language = _normalise_language(request.POST.get("Languages"))
 
-        ins = forminput(email=email, audiences = audiences, ageranges = ageranges, gp = gp, recommendations = recommendations)
-        ins.save()
-        print("The data has been written to the db")  
-    return render(request, 'base/display.html', {'recommendations':recommendations})
-    
+        try:
+            raw_recommendations = fetch_recommendations(
+                language=language, genre_names=genre_preferences
+            )
+            recommendations = [asdict(movie) for movie in raw_recommendations]
+        except (MovieServiceError, ImproperlyConfigured) as exc:
+            error_message = str(exc)
+            logger.warning("Unable to fetch recommendations: %s", exc)
+        else:
+            forminput.objects.create(
+                email=email,
+                audiences=audiences,
+                ageranges=ageranges,
+                gp=genre_preferences,
+                recommendations=recommendations,
+            )
+
+    context = {
+        "recommendations": recommendations,
+        "error_message": error_message,
+    }
+    return render(request, "base/display.html", context)
+
 
 def single_form(request):
-    if request.method == 'POST':
-        print(request.POST)
-            # print(f'Value: {value}') in Python >= 3.7
-        email = request.POST['mail'] 
-        age = request.POST['age']
-        gp = request.POST.getlist('gp')
+    recommendations: List[dict] = []
+    error_message: str | None = None
+    score: int | None = None
 
-    # radio = []
-    # x = 0 
-    # for i in range(0,13):
-    #     radio = "radio"+str(i)
-    #     radio= request.POST["radio"]
-    #     # print(radio)
-    #     x = x + int(radio[0])
-    #     # print(x)
-    #     i = i+1
+    if request.method == "POST":
+        email = (request.POST.get("mail") or "").strip()
+        age = _safe_int(request.POST.get("age"), default=0)
+        genre_preferences = _clean_genre_selection(request.POST.getlist("gp"))
+        language = _normalise_language(request.POST.get("Languages"))
+        score = _calculate_survey_score(request.POST)
 
-    
+        try:
+            raw_recommendations = fetch_recommendations(
+                language=language, genre_names=genre_preferences
+            )
+            recommendations = [asdict(movie) for movie in raw_recommendations]
+        except (MovieServiceError, ImproperlyConfigured) as exc:
+            error_message = str(exc)
+            logger.warning("Unable to fetch recommendations: %s", exc)
+        else:
+            singleforminput.objects.create(
+                email=email,
+                age=age,
+                sum=score or 0,
+                gp=genre_preferences,
+                recommendations=recommendations,
+            )
 
-
-
-
-        radio = request.POST['radio']
-        radio1 = request.POST['radio1']
-        radio2 = request.POST['radio2']
-        radio3 = request.POST['radio3']
-        radio4 = request.POST['radio4']
-        radio5 = request.POST['radio5']
-        radio6 = request.POST['radio6']
-        radio7 = request.POST['radio7']
-        radio8 = request.POST['radio8']
-        radio9 = request.POST['radio9']
-        radio10 = request.POST['radio10']
-        radio11 = request.POST['radio11']
-        radio12 = request.POST['radio12']
-        # print(radio12)
-        # y = int(radio12)
-        # print(y)
-
-        sum = int(radio) + int(radio1) + int(radio2) + int(radio3) + int(radio4) + int(radio5)+int(radio6) + int(radio7) + int(radio8) + int(radio9) + int(radio10) + int(radio11) + int(radio12)
-        print(sum)
-    
-
-        # Scoring a 12 or higher on the short version may indicate the presence of depression in the respondent.
+    context = {
+        "recommendations": recommendations,
+        "sum": score,
+        "error_message": error_message,
+    }
+    return render(request, "base/displaysingle.html", context)
 
 
-        # print(gp)
-        genrestring = [] 
-        for string in gp: 
-            if(string != 'none'):
-                genrestring.append(str(genres[string][0]))
-        genrestring = ','.join(genrestring)
-        languages = request.POST['Languages']
-        x1 = requests.get("https://api.themoviedb.org/3/discover/movie?api_key=34fe3fc711aaf02629366ba6335190d4&language={}&page=1&include_adult=false&with_genres={}&sort_by=popularity.desc".format(languages, genrestring))
-        recommendations = []
-        for o in x1.json()['results']:
-            movie = {}
-            movie['title'] = o['title']
-            movie['genre'] = [reverse_genres[x] for x in o['genre_ids']]
-            #print(o['title'])
-            #print(o['original_language'])
-            #print([reverse_genres[x] for x in o['genre_ids']])
-            # print(o['popularity'])
-            recommendations.append(movie)     
-
-        singleinput = singleforminput( email=email, age = age, gp = gp, recommendations = recommendations, sum = sum)
-        singleinput.save()
-        print("The data has been written to the db")  
-    return render(request, 'base/displaysingle.html', {'recommendations':recommendations, 'sum':sum})
+def _clean_genre_selection(raw_selection: Iterable[str]) -> List[str]:
+    return [value for value in raw_selection if value and value.lower() != "none"]
 
 
+def _safe_int(value: str | None, *, default: int = 0) -> int:
+    try:
+        return int(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
 
-# def tictac(request):
-#     return render(request, 'base/tictactoe.html')
 
-# def wordle(request):
-#     return render(request, 'base/wordle.html')
+def _normalise_language(language: str | None) -> str:
+    language = (language or "").strip()
+    if not language or language.lower() == "none":
+        return DEFAULT_LANGUAGE
+    return language
 
 
+def _calculate_survey_score(data) -> int:
+    total = 0
+    for field_name in SURVEY_FIELD_NAMES:
+        total += _safe_int(data.get(field_name), default=0)
+    return total
